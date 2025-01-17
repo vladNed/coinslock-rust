@@ -1,5 +1,4 @@
 use rand::RngCore;
-use secp256k1::SecretKey;
 use sha2::{Digest, Sha256};
 use tokio::{fs::File, io::AsyncReadExt};
 
@@ -10,14 +9,10 @@ const ALLOWED_SIZE: [usize; 2] = [16, 32];
 #[inline]
 fn token_bytes<const T: usize>() -> [u8; T] {
     let mut rng = rand::thread_rng();
-    let mut entropy = [0u8; 32];
+    let mut entropy = [0u8; T];
     rng.fill_bytes(&mut entropy);
 
-    let secret_key = SecretKey::from_slice(&entropy).expect("16 bytes, within curve order");
-
-    secret_key.secret_bytes()[..T]
-        .try_into()
-        .expect("16 bytes, within curve order")
+    entropy
 }
 
 #[inline(always)]
