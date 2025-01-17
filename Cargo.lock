@@ -467,6 +467,7 @@ dependencies = [
  "env_logger",
  "hmac",
  "log",
+ "once_cell",
  "pbkdf2",
  "rand",
  "ripemd",
