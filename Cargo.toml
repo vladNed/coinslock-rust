@@ -1,18 +1,28 @@
 [package]
 name = "coinslock-rust"
+authors = ["Vlad Nedelcu <nedelcuvd@gmail.com>"]
+readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
 crate-type = ['lib']
 
+[[bin]]
+name = "coinslock"
+path = "src/bin/main.rs"
+
 [dependencies]
 hmac = "0.12.1"
 pbkdf2 = "0.12.2"
 rand = "0.8.5"
+ripemd = "0.1.3"
 secp256k1 = "0.30.0"
 sha2 = "0.10.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 tokio = { version = "1", features = ["io-util", "fs", "macros", "sync", "rt-multi-thread"]}
-
-
-
+actix-web = "4"
+env_logger = "0.11.6"
+log = "0.4.25"
+bitcoin = "0.32.5"

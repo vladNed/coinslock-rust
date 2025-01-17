@@ -7,7 +7,7 @@ type SecretResult<T> = Result<T, std::io::Error>;
 const ALLOWED_SIZE: [usize; 2] = [16, 32];
 
 #[inline]
-fn token_bytes<const T: usize>() -> [u8; T] {
+pub fn token_bytes<const T: usize>() -> [u8; T] {
     let mut rng = rand::thread_rng();
     let mut entropy = [0u8; T];
     rng.fill_bytes(&mut entropy);
@@ -61,18 +61,18 @@ async fn read_word_list(word_list_path: &str) -> SecretResult<Vec<String>> {
 ///
 /// ### Errors
 /// If the word list file cannot be read or if there is an error generating
-pub async fn generate_secret<const T: usize>() -> SecretResult<Vec<String>> {
-    if !ALLOWED_SIZE.contains(&T) {
+pub async fn generate_secret(entropy: &[u8]) -> SecretResult<Vec<String>> {
+    let entropy_size = entropy.len();
+    if !ALLOWED_SIZE.contains(&entropy_size) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "Invalid entropy size",
         ));
     }
     let words = read_word_list(super::WORD_LIST_PATH).await?;
-    let entropy = token_bytes::<T>();
-    let entropy_bits = bytes_to_bits(&entropy);
+    let entropy_bits = bytes_to_bits(entropy);
     let checksum = Sha256::digest(entropy);
-    let checksum_size = (T * 8) / 32;
+    let checksum_size = (entropy_size * 8) / 32;
     let checksum_bits = bytes_to_bits(&checksum)[..checksum_size].to_string();
     let total_bits = entropy_bits + &checksum_bits;
 
@@ -129,7 +129,7 @@ pub async fn mnemonic_to_entropy(mnemonic: Vec<String>) -> SecretResult<Vec<u8>>
 
 #[cfg(test)]
 mod tests {
-    use secret::bytes_to_bits;
+    use secret::{bytes_to_bits, token_bytes};
 
     use crate::blockchain::*;
 
@@ -166,31 +166,36 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_secret() {
-        let mnemonic = secret::generate_secret::<16>().await;
+        let entropy = token_bytes::<16>();
+        let mnemonic = secret::generate_secret(&entropy).await;
         assert!(mnemonic.is_ok());
         assert_eq!(mnemonic.unwrap().len(), 12);
 
-        let mnemonic = secret::generate_secret::<32>().await;
+        let entropy = token_bytes::<32>();
+        let mnemonic = secret::generate_secret(&entropy).await;
         assert!(mnemonic.is_ok());
         assert_eq!(mnemonic.unwrap().len(), 24);
     }
 
     #[tokio::test]
     async fn test_invalid_entropy_value() {
-        let mnemonic = secret::generate_secret::<20>().await;
+        let entropy = token_bytes::<20>();
+        let mnemonic = secret::generate_secret(&entropy).await;
         assert!(mnemonic.is_err());
     }
 
     #[tokio::test]
     async fn test_mnemonic_to_entropy() {
-        let mnemonic = secret::generate_secret::<16>().await;
+        let entropy = token_bytes::<16>();
+        let mnemonic = secret::generate_secret(&entropy).await;
         assert!(mnemonic.is_ok());
 
         let entropy = secret::mnemonic_to_entropy(mnemonic.unwrap()).await;
         assert!(entropy.is_ok());
         assert_eq!(entropy.unwrap().len(), 16);
 
-        let mnemonic = secret::generate_secret::<32>().await;
+        let entropy = token_bytes::<32>();
+        let mnemonic = secret::generate_secret(&entropy).await;
         assert!(mnemonic.is_ok());
 
         let entropy = secret::mnemonic_to_entropy(mnemonic.unwrap()).await;

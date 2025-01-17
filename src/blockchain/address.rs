@@ -1,22 +1,22 @@
+use std::io::{Error, ErrorKind};
+
 use hmac::Hmac;
-use secp256k1::{PublicKey, Secp256k1, SecretKey};
-use sha2::Sha512;
 use pbkdf2::pbkdf2;
+use secp256k1::{ecdsa::SerializedSignature, Message, PublicKey, Secp256k1, SecretKey};
+use sha2::Sha512;
 
-use super::secret;
+use super::{secret, types::RecipientKey};
 
-const DEFAULT_SALT: &[u8] = b"mnemonic";
-
-fn mnemonic_to_seed(mnemonic: Vec<String>) -> Result<[u8; 64], std::io::Error> {
+fn mnemonic_to_seed(mnemonic: Vec<String>) -> Result<[u8; 64], Error> {
     let mut seed = [0u8; 64];
     match pbkdf2::<Hmac<Sha512>>(
         mnemonic.join(" ").as_bytes(),
-        DEFAULT_SALT,
+        super::DEFAULT_SALT,
         2048,
         &mut seed,
     ) {
         Ok(_) => {}
-        Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+        Err(e) => return Err(Error::new(ErrorKind::InvalidData, e)),
     }
 
     Ok(seed)
@@ -29,12 +29,18 @@ pub struct GuardianWallet {
 }
 
 impl GuardianWallet {
-    pub async fn generate_new<const T: usize>() -> Result<Self, std::io::Error> {
-        let mnemonic = secret::generate_secret::<T>().await?;
+    fn public_key_bytes(&self) -> [u8; 33] {
+        self.public_key().serialize()
+    }
+
+    pub async fn generate_new() -> Result<Self, Error> {
+        let entropy = secret::token_bytes::<32>();
+        let mnemonic = secret::generate_secret(&entropy).await?;
         let seed = mnemonic_to_seed(mnemonic).unwrap();
 
         let secp = Secp256k1::new();
-        let sk = SecretKey::from_slice(&seed[..32]).expect("Seed did not produce a valid secret key");
+        let sk =
+            SecretKey::from_slice(&seed[..32]).expect("Seed did not produce a valid secret key");
         let pk = PublicKey::from_secret_key(&secp, &sk);
 
         Ok(Self { sk, pk })
@@ -44,8 +50,43 @@ impl GuardianWallet {
         self.pk
     }
 
-    pub fn public_key_commitment() -> PublicKey {
-        unimplemented!()
+    pub fn public_key_commitment(&self) -> RecipientKey {
+        super::crypto::hash_160(&self.public_key_bytes())
     }
 
+    pub fn sign(&self, hashed_data: [u8; 32]) -> Result<SerializedSignature, Error> {
+        let secp = Secp256k1::new();
+        let message = Message::from_digest(hashed_data);
+        let signature = secp.sign_ecdsa(&message, &self.sk);
+
+        Ok(signature.serialize_der())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_generate_new() {
+        let wallet = GuardianWallet::generate_new().await.unwrap();
+        assert_eq!(wallet.sk.secret_bytes().len(), 32);
+        assert_eq!(wallet.public_key().serialize().len(), 33);
+    }
+
+    #[tokio::test]
+    async fn test_public_key_commitment() {
+        let wallet = GuardianWallet::generate_new().await.unwrap();
+        let commitment = wallet.public_key_commitment();
+        assert_eq!(commitment.len(), 20);
+    }
+
+    #[tokio::test]
+    async fn test_sign() {
+        let wallet = GuardianWallet::generate_new().await.unwrap();
+        let hashed_data = [0u8; 32];
+        let signature = wallet.sign(hashed_data);
+        assert!(signature.is_ok());
+        assert_eq!(signature.unwrap().len(), 71);
+    }
 }
