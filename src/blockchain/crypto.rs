@@ -5,7 +5,6 @@ use super::types::RecipientKey;
 
 /// Returns the RIPEMD160 hash of the input.
 pub(super) fn ripemd160(input: &[u8]) -> RecipientKey {
-
     let mut hasher = Ripemd160::new();
     hasher.update(input);
 

@@ -1,3 +1,4 @@
+use bitcoin::hex::DisplayHex;
 use once_cell::sync::Lazy;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
@@ -132,6 +133,14 @@ pub async fn mnemonic_to_entropy(mnemonic: Vec<String>) -> SecretResult<Vec<u8>>
     }
 
     Ok(entropy_bytes)
+}
+
+pub fn hash_id(data: String) -> String {
+    let d = super::crypto::sha256(data.as_bytes());
+    let mut id = [0u8; 8];
+    id.copy_from_slice(&d[0..8]);
+
+    id.as_hex().to_string()
 }
 
 #[cfg(test)]

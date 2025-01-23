@@ -1,9 +1,15 @@
 use bitcoin::{
-    opcodes::{all::*, OP_0}, script::Builder, Address, Network, Script
+    opcodes::{all::*, OP_0},
+    script::Builder,
+    Address, Script,
 };
 
-use super::{crypto, types::{HashValue, RecipientKey}};
+use crate::settings::get_settings;
 
+use super::{
+    crypto,
+    types::{HashValue, RecipientKey},
+};
 
 /// Create a hash lock contract that locks the funds until the secret is revealed.
 fn hash_lock_contract(secret_hash: HashValue, recipient: RecipientKey) -> Box<Script> {
@@ -33,11 +39,12 @@ fn pub_key_contract(script_hash: HashValue) -> Box<Script> {
 
 /// Generate a pay-to-witness-script-hash address.
 pub fn generate_p2wsh_address(secret: &[u8], recipient: RecipientKey) -> Address {
+    let settings = get_settings();
     let secret_hash = crypto::sha256(secret);
     let script = hash_lock_contract(secret_hash, recipient);
 
     let script_hash = crypto::sha256(&script.as_bytes());
     let script_pub_key = pub_key_contract(script_hash);
 
-    Address::from_script(&script_pub_key, Network::Bitcoin).unwrap()
+    Address::from_script(&script_pub_key, settings.network).unwrap()
 }

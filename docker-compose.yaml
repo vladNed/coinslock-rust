@@ -1,0 +1,29 @@
+
+services:
+
+  bitcoind:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile
+    image: coinslock_btc
+    restart: unless-stopped
+    container_name: coinslock_btc
+    ports:
+      - "18444:18444" # P2P port
+      - "18443:18443" # RPC port
+    networks:
+      - coinslock-network
+
+  redis:
+    container_name: coinslock_cache
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=test
+    networks:
+      - coinslock-network
+
+networks:
+  coinslock-network:
+    driver: bridge
